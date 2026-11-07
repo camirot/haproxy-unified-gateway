@@ -18,6 +18,7 @@ import (
 	"log/slog"
 	"sync"
 
+	v3 "github.com/haproxytech/haproxy-unified-gateway/api/gate/v3"
 	"github.com/haproxytech/haproxy-unified-gateway/hug/haproxy/api"
 	"github.com/haproxytech/haproxy-unified-gateway/hug/reload"
 	"github.com/haproxytech/haproxy-unified-gateway/k8s/gate/haproxy/diffs"
@@ -52,6 +53,8 @@ type HaproxyConfMgrImpl struct {
 	configuration   Configuration
 	firstSync       FirstSync
 	params          HaproxyConfMgrParams
+	// appliedRealIP is the realIP spec the frontends were last generated with
+	appliedRealIP *v3.RealIPSpec
 }
 
 type FirstSync struct {

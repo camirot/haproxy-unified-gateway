@@ -1,0 +1,23 @@
+# Take the real client address from the CF-Connecting-IP header, but only when the
+# TCP peer is a trusted proxy (here: Cloudflare edge addresses).
+#
+# The list file must exist in the HAProxy container before this resource is applied
+# (for example a ConfigMap mounted at /usr/local/hug/aux/cloudflare-ips.lst, one CIDR
+# per line, IPv4 and IPv6). It is only read when HAProxy starts or reloads: a change
+# of the list needs a reload (restart the pods).
+apiVersion: gate.v3.haproxy.org/v3
+kind: HugConf
+metadata:
+  name: hugconf
+  namespace: haproxy-unified-gateway
+spec:
+  logging:
+    defaultLevel: "Info"
+  realIP:
+    header: CF-Connecting-IP
+    trustedPeersFile: /usr/local/hug/aux/cloudflare-ips.lst
+    # or inline:
+    # trustedCIDRs:
+    #   - 173.245.48.0/20
+    #   - 2400:cb00::/32
+    mode: set-src # or logOnly

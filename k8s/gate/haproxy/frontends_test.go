@@ -77,6 +77,7 @@ func TestTLSPassthroughRulesScopeConsistency(t *testing.T) {
 func httpFastPathRules(t *testing.T) ([]*models.HTTPRequestRule, map[string]*models.ACL) {
 	t.Helper()
 	httpRules, aclList := httpFrontendRules(
+		nil,
 		"/maps/fe/listener_exact_match.map",
 		"/maps/fe/listener_wildcard_match.map",
 		"/maps/fe/listener_route_exact_match.map",

@@ -17,8 +17,10 @@ import (
 	"context"
 	"encoding/json"
 	"log/slog"
+	"reflect"
 
 	"github.com/haproxytech/client-native/v6/models"
+	v3 "github.com/haproxytech/haproxy-unified-gateway/api/gate/v3"
 	"github.com/haproxytech/haproxy-unified-gateway/k8s/gate/conditions/generic"
 	"github.com/haproxytech/haproxy-unified-gateway/k8s/gate/haproxy/storage/maps"
 	"github.com/haproxytech/haproxy-unified-gateway/k8s/gate/logging"
@@ -36,11 +38,17 @@ func (b *HaproxyConfMgrImpl) getFrontendName(vListenerName string) string {
 
 func (b *HaproxyConfMgrImpl) processVirtualListener() error {
 	var errors utils.Errors
+	// A change of the realIP configuration impacts every HTTP/HTTPS frontend, even unchanged ones.
+	realIPChanged := !reflect.DeepEqual(b.appliedRealIP, b.controllerStore.GateTree.RealIP)
 	// VirtualListeners are mapped 1 to 1 with Frontends,
 	// so we can directly create/update/delete Frontends while processing VirtualListeners
 	for vlName, vListener := range b.controllerStore.GateTree.VirtualListeners {
 		switch vListener.Status {
 		case store.StatusUnchanged:
+			if realIPChanged {
+				// upsertFrontend is a no-op when the generated frontend is identical (TCP/TLS ones)
+				errors.Add(b.upsertFrontends(vlName, vListener))
+			}
 			continue
 		case store.StatusUpserted:
 			err := b.onUpsertedVirtualListener(vlName, vListener)
@@ -51,7 +59,26 @@ func (b *HaproxyConfMgrImpl) processVirtualListener() error {
 		}
 	}
 
+	if realIPChanged {
+		b.appliedRealIP = b.controllerStore.GateTree.RealIP.DeepCopy()
+	}
 	return errors.Result()
+}
+
+// realIPForFrontend returns the realIP spec to apply to an HTTP/HTTPS frontend,
+// nil when it is not configured or invalid (the client address is then left untouched).
+func (b *HaproxyConfMgrImpl) realIPForFrontend(frontendName string) *v3.RealIPSpec {
+	spec := b.controllerStore.GateTree.RealIP
+	if spec == nil {
+		return nil
+	}
+	if err := validateRealIP(spec); err != nil {
+		b.logger.LogAttrs(context.Background(), slog.LevelError, "Ignoring invalid realIP configuration",
+			logging.LogAttrFrontendName(frontendName),
+			logging.LogAttrError(err))
+		return nil
+	}
+	return spec
 }
 
 func (b *HaproxyConfMgrImpl) onUpsertedVirtualListener(vlName string, vListener *tree.VirtualListener) error {
@@ -260,6 +287,7 @@ func (b *HaproxyConfMgrImpl) newFrontend(vListenerName string, vListener *tree.V
 
 	default:
 		httpRules, aclList = httpFrontendRules(
+			b.realIPForFrontend(frontendName),
 			listenerExactMatchMap.Path.FullPath(),
 			listenerWildcardMatchMap.Path.FullPath(),
 			listenerRouteExactMatchMap.Path.FullPath(),
@@ -368,6 +396,8 @@ func (b *HaproxyConfMgrImpl) deleteFrontendForVirtualListener(virtualListenerNam
 
 // httpFrontendRules returns the HTTP request rules and ACLs implementing host,
 // listener, listener-route and path selection for HTTP(S) frontends.
+// When realIP is not nil, the rules extracting the real client address from a
+// header are placed before all the others.
 //
 // Selection of listener and listener-route is fully native (map/map_beg).
 // Path lookup has two tiers:
@@ -380,6 +410,7 @@ func (b *HaproxyConfMgrImpl) deleteFrontendForVirtualListener(virtualListenerNam
 //     (path specificity first: exact > longest prefix > regex; exact-host
 //     beats wildcard-host as tiebreaker).
 func httpFrontendRules(
+	realIP *v3.RealIPSpec,
 	listenerExactMatch, listenerWildcardMatch,
 	listenerRouteExactMatch, listenerRouteWildcardMatch,
 	pathExactMap, pathPrefixMap, pathRegexMap, mapsDir string,
@@ -644,6 +675,12 @@ func httpFrontendRules(
 			Value:     "-m found",
 			Metadata:  map[string]any{"hug": "preload path_regex.map for lua.find_route"},
 		},
+	}
+	if realIP != nil {
+		// Must run first: later rules, ACLs and the logs see the rewritten address.
+		realIPHTTPRules, realIPACLs := realIPRules(realIP)
+		httpRules = append(realIPHTTPRules, httpRules...)
+		aclList = append(realIPACLs, aclList...)
 	}
 	return httpRules, aclList
 }

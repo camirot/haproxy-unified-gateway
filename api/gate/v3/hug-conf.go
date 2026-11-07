@@ -26,7 +26,7 @@ import (
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +kubebuilder:object:root=true
-// +kubebuilder:metadata:annotations="conf.hug/version=v0.7.0"
+// +kubebuilder:metadata:annotations="conf.hug/version=v0.8.0"
 
 // HugConf is a specification for a the controller related configuration
 type HugConf struct {
@@ -72,6 +72,46 @@ type ControllerConfSpec struct {
 	GlobalRef   *CRReference `json:"globalRef,omitempty"`
 	DefaultsRef *CRReference `json:"defaultsRef,omitempty"`
 	Logging     Logging      `json:"logging"`
+	// RealIP makes the HTTP and HTTPS frontends use the client address carried
+	// in a request header (for example CF-Connecting-IP) when the TCP peer is
+	// a trusted proxy. TCP and TLS passthrough frontends are not affected.
+	RealIP *RealIPSpec `json:"realIP,omitempty"`
+}
+
+// +kubebuilder:validation:Enum=set-src;logOnly
+type RealIPMode string
+
+const (
+	// RealIPModeSetSrc rewrites the source address of the connection (http-request set-src):
+	// %ci, ACLs and stick tables see the real client address.
+	RealIPModeSetSrc RealIPMode = "set-src"
+	// RealIPModeLogOnly only stores the address in the txn.realip variable,
+	// the log format has to reference it explicitly.
+	RealIPModeLogOnly RealIPMode = "logOnly"
+)
+
+// RealIPSpec describes how the real client address is extracted from a request header.
+// The header is only trusted when the TCP peer matches the trusted peers list.
+// +kubebuilder:validation:XValidation:rule="has(self.trustedPeersFile) != has(self.trustedCIDRs)",message="exactly one of trustedPeersFile and trustedCIDRs must be set"
+type RealIPSpec struct {
+	// Header is the request header holding the client address, for example CF-Connecting-IP.
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:Pattern=`^[A-Za-z0-9-]+$`
+	// +kubebuilder:validation:MaxLength=128
+	Header string `json:"header"`
+	// TrustedPeersFile is the path of a file in the HAProxy container with one CIDR per line
+	// (IPv4 and IPv6). The file is only read when HAProxy starts or reloads.
+	// It must exist before this resource is applied, otherwise the configuration is rejected.
+	// +kubebuilder:validation:Pattern=`^/[^\s]+$`
+	// +kubebuilder:validation:MaxLength=1024
+	TrustedPeersFile string `json:"trustedPeersFile,omitempty"`
+	// TrustedCIDRs is an inline list of trusted peer CIDRs.
+	// +kubebuilder:validation:MaxItems=256
+	// +kubebuilder:validation:items:Pattern=`^[0-9a-fA-F:.]+(/[0-9]{1,3})?$`
+	TrustedCIDRs []string `json:"trustedCIDRs,omitempty"`
+	// Mode is set-src (default) or logOnly.
+	// +kubebuilder:default=set-src
+	Mode RealIPMode `json:"mode,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

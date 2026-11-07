@@ -19,6 +19,7 @@ import (
 	"log/slog"
 	"sync"
 
+	v3 "github.com/haproxytech/haproxy-unified-gateway/api/gate/v3"
 	"github.com/haproxytech/haproxy-unified-gateway/k8s/gate/conditions/generic"
 	rc "github.com/haproxytech/haproxy-unified-gateway/k8s/gate/conditions/routes"
 	"github.com/haproxytech/haproxy-unified-gateway/k8s/gate/logging"
@@ -57,6 +58,8 @@ type GateTree struct {
 	// ListenerSets holds the ListenerSets of the cluster. Their listeners are not
 	// here: each is contributed to the merged list of its parent Gateway.
 	ListenerSets map[types.NamespacedName]*ListenerSet
+	// RealIP is the realIP spec of the HugConf, nil when not configured.
+	RealIP *v3.RealIPSpec
 	// mu protects concurrent access to gateway listener conditions, which may
 	// be written by the feedback path (forwardFeedback) from a separate goroutine.
 	mu sync.RWMutex

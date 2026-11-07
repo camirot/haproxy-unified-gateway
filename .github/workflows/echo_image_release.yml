@@ -5,6 +5,7 @@ on:
       - "v*"
 jobs:
   build:
+    if: ${{ github.repository_owner == 'haproxytech' }}
     runs-on: ubuntu-latest
     permissions:
       contents: read

@@ -8,6 +8,7 @@ on:
   workflow_dispatch:
 jobs:
   main:
+    if: ${{ github.repository_owner == 'haproxytech' }}
     runs-on: ubuntu-latest
     env:
       DOCKER_IMAGE: haproxytech/haproxy-unified-gateway

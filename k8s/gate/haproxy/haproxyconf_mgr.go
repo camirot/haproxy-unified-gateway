@@ -50,11 +50,11 @@ type HaproxyConfMgrImpl struct {
 	logger          *slog.Logger
 	mu              *sync.Mutex
 	controllerStore *tree.ControllerStore
-	configuration   Configuration
-	firstSync       FirstSync
-	params          HaproxyConfMgrParams
 	// appliedRealIP is the realIP spec the frontends were last generated with
 	appliedRealIP *v3.RealIPSpec
+	firstSync     FirstSync
+	configuration Configuration
+	params        HaproxyConfMgrParams
 }
 
 type FirstSync struct {

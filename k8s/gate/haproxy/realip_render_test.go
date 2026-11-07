@@ -78,7 +78,7 @@ func TestRealIPRenderedConfig(t *testing.T) {
 			}
 			rules, acls := realIPRules(tt.spec)
 			fe := models.Frontend{
-				FrontendBase:        models.FrontendBase{Name: "fe", Mode: "http"},
+				Name: "fe", Mode: "http",
 				ACLList:             acls,
 				HTTPRequestRuleList: rules,
 			}

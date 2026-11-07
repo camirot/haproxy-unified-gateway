@@ -71,11 +71,11 @@ type CRReference struct {
 type ControllerConfSpec struct {
 	GlobalRef   *CRReference `json:"globalRef,omitempty"`
 	DefaultsRef *CRReference `json:"defaultsRef,omitempty"`
-	Logging     Logging      `json:"logging"`
 	// RealIP makes the HTTP and HTTPS frontends use the client address carried
 	// in a request header (for example CF-Connecting-IP) when the TCP peer is
 	// a trusted proxy. TCP and TLS passthrough frontends are not affected.
-	RealIP *RealIPSpec `json:"realIP,omitempty"`
+	RealIP  *RealIPSpec `json:"realIP,omitempty"`
+	Logging Logging     `json:"logging"`
 }
 
 // +kubebuilder:validation:Enum=set-src;logOnly
@@ -105,13 +105,13 @@ type RealIPSpec struct {
 	// +kubebuilder:validation:Pattern=`^/[^\s]+$`
 	// +kubebuilder:validation:MaxLength=1024
 	TrustedPeersFile string `json:"trustedPeersFile,omitempty"`
+	// Mode is set-src (default) or logOnly.
+	// +kubebuilder:default=set-src
+	Mode RealIPMode `json:"mode,omitempty"`
 	// TrustedCIDRs is an inline list of trusted peer CIDRs.
 	// +kubebuilder:validation:MaxItems=256
 	// +kubebuilder:validation:items:Pattern=`^[0-9a-fA-F:.]+(/[0-9]{1,3})?$`
 	TrustedCIDRs []string `json:"trustedCIDRs,omitempty"`
-	// Mode is set-src (default) or logOnly.
-	// +kubebuilder:default=set-src
-	Mode RealIPMode `json:"mode,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
